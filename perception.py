@@ -1,4 +1,5 @@
 import urllib.request
+from collections import deque
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Optional
@@ -35,10 +36,14 @@ _YAW_RATIO_MAX = 0.35
 _PITCH_N_MIN = 0.12
 _PITCH_N_MAX = 0.72
 
-_IRIS_H_BAND_LO = 0.38
-_IRIS_H_BAND_HI = 0.62
-_IRIS_V_BAND_LO = 0.38
-_IRIS_V_BAND_HI = 0.62
+_IRIS_H_BAND_LO = 0.36
+_IRIS_H_BAND_HI = 0.64
+
+_IRIS_V_BAND_LO = 0.43
+_IRIS_V_BAND_HI = 0.57
+
+_SMOOTHING_WINDOW = 8
+_SMOOTHING_MIN_TRUE = 5
 
 
 @dataclass
@@ -47,6 +52,7 @@ class FacePerceptionResult:
     head_forward: bool
     eye_contact: bool
     looking_at_camera: bool
+    gaze_direction: str
     raw_result: object
     debug_text: str
 
@@ -109,7 +115,9 @@ def _ratio_in_span(value: float, a: float, b: float) -> Optional[float]:
     return (value - lo) / span
 
 
-def _eye_contact_iris(lms: list) -> Optional[tuple[float, float, float, float]]:
+def _eye_contact_iris_ratios(
+    lms: list,
+) -> Optional[tuple[float, float, float, float]]:
     """(h_left, v_left, h_right, v_right) normalized iris position per eye."""
     if len(lms) < _MIN_LANDMARKS_FOR_IRIS:
         return None
@@ -140,24 +148,41 @@ def _eye_contact_iris(lms: list) -> Optional[tuple[float, float, float, float]]:
     return hl, vl, hr, vr
 
 
-def _eye_contact(
+def _gaze_direction_from_ratios(
+    hl: float, vl: float, hr: float, vr: float
+) -> str:
+    if vl < _IRIS_V_BAND_LO and vr < _IRIS_V_BAND_LO:
+        return "up"
+    if vl > _IRIS_V_BAND_HI and vr > _IRIS_V_BAND_HI:
+        return "down"
+    if not (
+        _IRIS_H_BAND_LO <= hl <= _IRIS_H_BAND_HI
+        and _IRIS_H_BAND_LO <= hr <= _IRIS_H_BAND_HI
+    ):
+        return "left_or_right"
+    return "center"
+
+
+def _eye_contact_and_gaze(
     lms: list, head_forward: bool
-) -> tuple[bool, Optional[tuple[float, float, float, float]], bool]:
-    """Prototype iris-in-aperture check; fallback mirrors head_forward only."""
-    ratios = _eye_contact_iris(lms)
+) -> tuple[bool, Optional[tuple[float, float, float, float]], bool, str]:
+    """Iris gaze + contact; fallback: eye_contact=head_forward, gaze_direction=unknown."""
+    ratios = _eye_contact_iris_ratios(lms)
     if ratios is None:
-        return head_forward, None, True
+        return head_forward, None, True, "unknown"
 
     hl, vl, hr, vr = ratios
-    ok_l = (
-        _IRIS_H_BAND_LO <= hl <= _IRIS_H_BAND_HI
-        and _IRIS_V_BAND_LO <= vl <= _IRIS_V_BAND_HI
+    gaze_direction = _gaze_direction_from_ratios(hl, vl, hr, vr)
+
+    h_ok_l = _IRIS_H_BAND_LO <= hl <= _IRIS_H_BAND_HI
+    h_ok_r = _IRIS_H_BAND_LO <= hr <= _IRIS_H_BAND_HI
+    v_ok_l = _IRIS_V_BAND_LO <= vl <= _IRIS_V_BAND_HI
+    v_ok_r = _IRIS_V_BAND_LO <= vr <= _IRIS_V_BAND_HI
+
+    eye_contact = bool(
+        gaze_direction == "center" and h_ok_l and h_ok_r and v_ok_l and v_ok_r
     )
-    ok_r = (
-        _IRIS_H_BAND_LO <= hr <= _IRIS_H_BAND_HI
-        and _IRIS_V_BAND_LO <= vr <= _IRIS_V_BAND_HI
-    )
-    return bool(ok_l and ok_r), ratios, False
+    return eye_contact, ratios, False, gaze_direction
 
 
 class FacePerception:
@@ -174,26 +199,38 @@ class FacePerception:
             min_tracking_confidence=0.5,
         )
         self._landmarker = vision.FaceLandmarker.create_from_options(options)
+        self._looking_smooth: deque[bool] = deque(maxlen=_SMOOTHING_WINDOW)
 
     def detect(self, frame_rgb, timestamp_ms: int) -> FacePerceptionResult:
         mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=frame_rgb)
         raw = self._landmarker.detect_for_video(mp_image, timestamp_ms)
         if not raw.face_landmarks:
+            self._looking_smooth.clear()
             return FacePerceptionResult(
                 face_detected=False,
                 head_forward=False,
                 eye_contact=False,
                 looking_at_camera=False,
+                gaze_direction="none",
                 raw_result=raw,
                 debug_text="no face",
             )
 
         lms = raw.face_landmarks[0]
         head_forward, yaw_ratio, pitch_n = _head_forward(lms)
-        eye_contact, eye_ratios, _used_fallback = _eye_contact(lms, head_forward)
-        looking_at_camera = bool(head_forward and eye_contact)
+        eye_contact, eye_ratios, _used_fallback, gaze_direction = (
+            _eye_contact_and_gaze(lms, head_forward)
+        )
+        raw_looking = bool(head_forward and eye_contact)
+        self._looking_smooth.append(raw_looking)
+        n_true = sum(1 for x in self._looking_smooth if x)
+        looking_at_camera = n_true >= _SMOOTHING_MIN_TRUE
 
-        parts = [f"yaw_ratio={yaw_ratio:.2f}", f"pitch_n={pitch_n:.2f}"]
+        parts = [
+            f"yaw_ratio={yaw_ratio:.2f}",
+            f"pitch_n={pitch_n:.2f}",
+            f"gaze_direction={gaze_direction}",
+        ]
         if eye_ratios is not None:
             hl, vl, hr, vr = eye_ratios
             parts += [
@@ -201,16 +238,19 @@ class FacePerception:
                 f"eye_y_L={vl:.2f}",
                 f"eye_x_R={hr:.2f}",
                 f"eye_y_R={vr:.2f}",
-                "iris",
+                "mode=iris",
             ]
         else:
-            parts.append("eye_contact=fallback/no_iris")
+            parts.append("mode=fallback/no_iris")
+
+        parts.append(f"raw_looking={raw_looking}")
 
         return FacePerceptionResult(
             face_detected=True,
             head_forward=head_forward,
             eye_contact=eye_contact,
             looking_at_camera=looking_at_camera,
+            gaze_direction=gaze_direction,
             raw_result=raw,
             debug_text="|".join(parts),
         )

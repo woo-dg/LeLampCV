@@ -34,7 +34,7 @@ def draw_perception(frame, perception_result: FacePerceptionResult, state: str) 
     color = _state_bgr(state)
     cv2.putText(
         frame,
-        f"STATE: {state}",
+        f"STATE (debounced): {state}",
         (10, 35),
         cv2.FONT_HERSHEY_SIMPLEX,
         0.9,
@@ -43,7 +43,19 @@ def draw_perception(frame, perception_result: FacePerceptionResult, state: str) 
     )
     y = 65
     detail_color = (220, 220, 220)
+    cv2.putText(
+        frame,
+        f"GAZE: {perception_result.gaze_direction}",
+        (10, y),
+        cv2.FONT_HERSHEY_SIMPLEX,
+        0.65,
+        (180, 220, 255),
+        2,
+    )
+    y += 28
+    raw_engaged = perception_result.face_detected and perception_result.looking_at_camera
     lines = [
+        f"raw_engaged={raw_engaged}",
         f"face_detected={perception_result.face_detected}",
         f"head_forward={perception_result.head_forward}",
         f"eye_contact={perception_result.eye_contact}",
