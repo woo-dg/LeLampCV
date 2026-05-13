@@ -27,8 +27,6 @@ A software-first digital twin for an expressive lamp agent that detects attentio
 
 Full system design (diagrams, data contracts, control loop, Sheets rationale): **[docs/system_design.md](docs/system_design.md)**.
 
-Source Mermaid (export to PNG/SVG before submission if you want a rendered figure): **[assets/diagrams/system_architecture.mmd](assets/diagrams/system_architecture.mmd)**.
-
 ### Three concurrent paths
 
 **Real-time control path** — closes the loop from pixels to something the lamp “does”:
@@ -63,13 +61,13 @@ These artifacts together show perception → command → memory → speech:
 | Artifact | What it proves |
 |----------|----------------|
 | [evaluation/submission_summary.md](evaluation/submission_summary.md) | Frozen headline metrics for judges (binary engagement + latency medians). |
-| Google Sheets **map_behaviour** / behavior log | Timestamped rows: gaze flags, FSM state, pan/tilt/light, debug text—readable proof of the command stream. |
+| [map_behaviour Google Sheet](https://docs.google.com/spreadsheets/d/e/2PACX-1vShtsMiFy-dDUZ51HagY5_e9-NLyyAsHlfsPSc7sOkUMaLDrS_ck8D2QgWa2VOVpyOLNdU2xE47PjKz/pubhtml) | Public run log from test sessions: timestamped perception signals, FSM states, behavior commands, pan/tilt/light values, and debug text. |
 | `runtime/memory/object_memory.jsonl` | Append-only object sightings (gitignored; copy a snippet if a rubric asks for raw memory). |
 | `simulator/latest_behavior.json` | Same `LampBehaviorCommand` fields the twin animates (gitignored at runtime). |
 | `simulator/latest_conversation.json` | Question, answer, routing mode, memory hit flag (gitignored at runtime). |
 | Terminal | `memory saved: …`, `Conversation mode: …`, TTS status lines. |
 
-**map_behaviour acts like a run log for the command stream.** If this were connected to physical hardware, the same pan/tilt/light values being written to the sheet are the values that would be sent to the actuator/light layer. The simulator stays on local JSON for latency; the sheet is there so reviewers can scroll through decisions without replaying video.
+**map_behaviour** is an external audit trail for the perception-to-behavior command stream—not the live control path. During a run, each logged row captures what the stack believed about engagement (face/gaze flags), which behavior state it entered, and the hardware-facing command fields that came out of `behavior.py`: pan angle, tilt angle, light color, brightness, behavior name, plus perception debug text. The Three.js twin reads **`simulator/latest_behavior.json`** from disk so motion stays responsive; nothing in the hot path waits on Google. The Sheet mirrors that same kind of command data so someone reviewing the project can scroll the timeline without our screen recording. If this codebase were wired to real hardware later, those pan/tilt/light values are the same quantities you’d map to servos, LED drivers, or other electronics—here they’re frozen as evidence from testing instead.
 
 ## Repository layout
 
@@ -155,7 +153,7 @@ The entry script `chdir`s to the repo root so JSON exports land in `simulator/`.
 
 ## Evaluation snapshot
 
-From `evaluation/submission_summary.md` (binary gaze reliability):
+From [evaluation/submission_summary.md](evaluation/submission_summary.md) (binary gaze reliability):
 
 - Total trials: **109**, correct **93**, accuracy **85.32%**
 - **ENGAGED**: **100.00%** (19 trials)
@@ -194,7 +192,8 @@ Module-level pipeline and failure containment: **[docs/architecture.md](docs/arc
 
 Demo video: **TODO add link**
 
-## Screenshots / GIFs / diagram export
+## Architecture diagram
 
-- Add simulator captures under `assets/screenshots/` or `assets/demo/`.
-- Render **[assets/diagrams/system_architecture.mmd](assets/diagrams/system_architecture.mmd)** to PNG or SVG (Mermaid CLI, VS Code plugin, or mermaid.live) and reference it here once exported.
+Source diagram (Mermaid): [assets/diagrams/system_architecture.mmd](assets/diagrams/system_architecture.mmd)
+
+Optional before submission: export that file to PNG or SVG if you want a static figure in the repo or write-up.
