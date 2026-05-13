@@ -1,0 +1,14 @@
+{
+  "timestamp": "",
+  "state": "DISENGAGED",
+  "behavior_name": "withdrawn",
+  "variant": "",
+  "pan_angle": 90.0,
+  "tilt_angle": 115.0,
+  "light_color": "blue",
+  "brightness": 0.25,
+  "motion_description": "head lowers slightly",
+  "light_description": "dim blue light",
+  "reason": "example payload",
+  "listening": false
+}

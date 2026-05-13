@@ -1,4 +1,34 @@
+.env
+*.env
 *.json
+!simulator/latest_behavior.example.json
+!simulator/latest_conversation.example.json
 credentials*.json
 *service*.json
-.env
+map-behaviour*.json
+__pycache__/
+*.py[cod]
+.Python
+.venv/
+venv/
+*.tmp
+
+# Large / local weights (place under models/; see models/README.md)
+*.pt
+*.onnx
+
+# Runtime outputs (see runtime/README paths in main README)
+runtime/memory/*
+!runtime/memory/.gitkeep
+runtime/metrics/*
+!runtime/metrics/.gitkeep
+
+# Legacy paths if present
+memory/object_memory.jsonl
+metrics/latency_log.csv
+metrics/engagement_trials.csv
+metrics/summary.md
+metrics/submission_summary.md
+
+simulator/latest_behavior.json
+simulator/latest_conversation.json

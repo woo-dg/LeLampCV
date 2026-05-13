@@ -15,13 +15,43 @@
   </head>
   <body>
     <div id="canvas-wrap"></div>
-    <div id="overlay">
-      <div><span class="label">state</span> <span id="ov-state">—</span></div>
-      <div><span class="label">behavior</span> <span id="ov-behavior">—</span></div>
-      <div><span class="label">pan</span> <span id="ov-pan">—</span></div>
-      <div><span class="label">tilt</span> <span id="ov-tilt">—</span></div>
-      <div><span class="label">brightness</span> <span id="ov-bright">—</span></div>
-    </div>
+
+    <aside id="panel-tl" class="floating-card" aria-label="Lamp state">
+      <div class="card-heading">Pipeline</div>
+      <div class="meta-row">
+        <span class="meta-label">state</span>
+        <span id="ov-state" class="meta-value">—</span>
+      </div>
+      <div class="meta-row">
+        <span class="meta-label">behavior</span>
+        <span id="ov-behavior" class="meta-value">—</span>
+      </div>
+      <div class="meta-row">
+        <span class="meta-label">variant</span>
+        <span id="ov-variant" class="meta-value">—</span>
+      </div>
+      <div class="meta-row">
+        <span class="meta-label">voice</span>
+        <span id="ov-listening" class="meta-value">—</span>
+      </div>
+    </aside>
+
+    <aside id="panel-br" class="floating-card" aria-label="Latest conversation">
+      <div class="card-heading">Conversation</div>
+      <div class="conv-block">
+        <span class="meta-label">question</span>
+        <p id="conv-q" class="conv-text">—</p>
+      </div>
+      <div class="conv-block">
+        <span class="meta-label">answer</span>
+        <p id="conv-a" class="conv-text">—</p>
+      </div>
+      <div class="conv-footer">
+        <span id="conv-mode-pill" class="pill">—</span>
+        <span id="conv-memory-badge" class="mem-badge is-hidden"></span>
+      </div>
+    </aside>
+
     <script type="module" src="simulator.js"></script>
   </body>
 </html>

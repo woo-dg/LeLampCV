@@ -1,0 +1,9 @@
+{
+  "timestamp": "",
+  "question": "where is my bottle?",
+  "answer": "example answer text",
+  "mode": "MEMORY_LOCATION_QUERY",
+  "object_query": "bottle",
+  "memory_found": true,
+  "listening": false
+}
