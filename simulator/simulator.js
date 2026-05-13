@@ -1,0 +1,211 @@
+import * as THREE from "three";
+
+const DEG = Math.PI / 180;
+/** Higher = snappier motion; lower = smoother */
+const LERP = 0.11;
+
+let targetPan = 0;
+let targetTilt = 0;
+let curPan = 0;
+let curTilt = 0;
+const targetColor = new THREE.Color();
+const curColor = new THREE.Color(0x3b82f6);
+let targetBright = 0.25;
+let curBright = 0.25;
+
+const latest = {
+  state: "DISENGAGED",
+  behavior_name: "withdrawn",
+  pan_angle: 90,
+  tilt_angle: 115,
+  brightness: 0.25,
+};
+
+function colorFromName(name) {
+  const c = new THREE.Color();
+  switch ((name || "").toLowerCase()) {
+    case "green":
+      c.setHex(0x22c55e);
+      break;
+    case "blue":
+      c.setHex(0x3b82f6);
+      break;
+    case "white":
+      c.setHex(0xe2e8f0);
+      break;
+    default:
+      c.setHex(0x94a3b8);
+  }
+  return c;
+}
+
+async function fetchBehavior() {
+  try {
+    const r = await fetch("latest_behavior.json?t=" + Date.now(), {
+      cache: "no-store",
+    });
+    if (!r.ok) return;
+    const data = await r.json();
+
+    latest.state = data.state ?? latest.state;
+    latest.behavior_name = data.behavior_name ?? latest.behavior_name;
+    latest.pan_angle = Number(data.pan_angle);
+    latest.tilt_angle = Number(data.tilt_angle);
+    latest.brightness = Number(data.brightness);
+
+    targetPan = (latest.pan_angle - 90) * DEG;
+    targetTilt = (latest.tilt_angle - 90) * DEG;
+    targetColor.copy(colorFromName(data.light_color));
+    targetBright = Math.max(0, Math.min(1, latest.brightness));
+
+    document.getElementById("ov-state").textContent = latest.state;
+    document.getElementById("ov-behavior").textContent = latest.behavior_name;
+    document.getElementById("ov-pan").textContent =
+      latest.pan_angle.toFixed(1) + "°";
+    document.getElementById("ov-tilt").textContent =
+      latest.tilt_angle.toFixed(1) + "°";
+    document.getElementById("ov-bright").textContent = targetBright.toFixed(2);
+  } catch {
+    /* ignore transient fetch errors */
+  }
+}
+
+setInterval(fetchBehavior, 100);
+
+const wrap = document.getElementById("canvas-wrap");
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+wrap.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0xffffff);
+
+const camera = new THREE.PerspectiveCamera(
+  42,
+  window.innerWidth / window.innerHeight,
+  0.1,
+  100
+);
+camera.position.set(1.15, 0.82, 1.32);
+camera.lookAt(0, 0.42, 0);
+
+scene.add(new THREE.AmbientLight(0xffffff, 0.52));
+
+const sun = new THREE.DirectionalLight(0xffffff, 0.82);
+sun.position.set(-2.2, 4.2, 3.2);
+sun.castShadow = true;
+sun.shadow.mapSize.set(1024, 1024);
+sun.shadow.camera.near = 0.5;
+sun.shadow.camera.far = 24;
+sun.shadow.camera.left = -4;
+sun.shadow.camera.right = 4;
+sun.shadow.camera.top = 4;
+sun.shadow.camera.bottom = -4;
+scene.add(sun);
+
+const groundMat = new THREE.MeshStandardMaterial({
+  color: 0xf1f5f9,
+  roughness: 0.94,
+  metalness: 0,
+});
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(14, 14), groundMat);
+ground.rotation.x = -Math.PI / 2;
+ground.receiveShadow = true;
+scene.add(ground);
+
+const matBody = new THREE.MeshStandardMaterial({
+  color: 0xf8fafc,
+  roughness: 0.34,
+  metalness: 0.12,
+});
+
+const base = new THREE.Mesh(
+  new THREE.CylinderGeometry(0.22, 0.26, 0.12, 48),
+  matBody
+);
+base.position.y = 0.06;
+base.castShadow = true;
+scene.add(base);
+
+const arm = new THREE.Mesh(
+  new THREE.CylinderGeometry(0.044, 0.048, 0.54, 28),
+  matBody
+);
+arm.position.y = 0.345;
+arm.castShadow = true;
+scene.add(arm);
+
+const panGroup = new THREE.Group();
+panGroup.position.y = 0.615;
+scene.add(panGroup);
+
+const panJoint = new THREE.Mesh(new THREE.SphereGeometry(0.068, 28, 28), matBody);
+panJoint.castShadow = true;
+panGroup.add(panJoint);
+
+const tiltGroup = new THREE.Group();
+panGroup.add(tiltGroup);
+
+const tiltJoint = new THREE.Mesh(
+  new THREE.CylinderGeometry(0.048, 0.048, 0.1, 20),
+  matBody
+);
+tiltJoint.rotation.z = Math.PI / 2;
+tiltJoint.castShadow = true;
+tiltGroup.add(tiltJoint);
+
+const head = new THREE.Mesh(
+  new THREE.BoxGeometry(0.21, 0.17, 0.25),
+  matBody
+);
+head.position.set(0, 0, 0.135);
+head.castShadow = true;
+tiltGroup.add(head);
+
+const glowGeo = new THREE.CircleGeometry(0.052, 56);
+const glowMat = new THREE.MeshStandardMaterial({
+  color: 0x3b82f6,
+  emissive: 0x3b82f6,
+  emissiveIntensity: 0.75,
+  roughness: 0.35,
+  metalness: 0,
+});
+const glow = new THREE.Mesh(glowGeo, glowMat);
+glow.position.set(0, 0, 0.128);
+tiltGroup.add(glow);
+
+const lampLight = new THREE.PointLight(0x3b82f6, 1.5, 4, 2);
+lampLight.position.set(0, 0, 0.24);
+lampLight.castShadow = false;
+tiltGroup.add(lampLight);
+
+function animate() {
+  requestAnimationFrame(animate);
+
+  curPan += (targetPan - curPan) * LERP;
+  curTilt += (targetTilt - curTilt) * LERP;
+  curColor.lerp(targetColor, LERP);
+  curBright += (targetBright - curBright) * LERP;
+
+  panGroup.rotation.y = curPan;
+  tiltGroup.rotation.x = curTilt;
+
+  glowMat.color.copy(curColor);
+  glowMat.emissive.copy(curColor);
+  glowMat.emissiveIntensity = 0.28 + curBright * 1.15;
+
+  lampLight.color.copy(curColor);
+  lampLight.intensity = 0.35 + curBright * 2.1;
+
+  renderer.render(scene, camera);
+}
+animate();
+
+window.addEventListener("resize", () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});

@@ -32,6 +32,8 @@ _LEFT_LID_BOT = 374
 
 _MIN_LANDMARKS_FOR_IRIS = 478
 
+_CALIBRATION_TARGET_FRAMES = 30
+
 _YAW_RATIO_MAX = 0.35
 _PITCH_N_MIN = 0.12
 _PITCH_N_MAX = 0.72
@@ -41,6 +43,13 @@ _IRIS_H_BAND_HI = 0.64
 
 _IRIS_V_BAND_LO = 0.43
 _IRIS_V_BAND_HI = 0.57
+
+_CALIBRATED_H_TOL = 0.14
+_CALIBRATED_V_TOL = 0.10
+
+_GAZE_CAL_DV_UP = 0.07
+_GAZE_CAL_DV_DOWN = 0.07
+_GAZE_CAL_DH_LR = 0.12
 
 _SMOOTHING_WINDOW = 8
 _SMOOTHING_MIN_TRUE = 5
@@ -55,6 +64,8 @@ class FacePerceptionResult:
     gaze_direction: str
     raw_result: object
     debug_text: str
+    calibrated: bool
+    calibration_text: str
 
 
 def _ensure_model(path: Path) -> None:
@@ -148,7 +159,7 @@ def _eye_contact_iris_ratios(
     return hl, vl, hr, vr
 
 
-def _gaze_direction_from_ratios(
+def _gaze_direction_from_ratios_fixed(
     hl: float, vl: float, hr: float, vr: float
 ) -> str:
     if vl < _IRIS_V_BAND_LO and vr < _IRIS_V_BAND_LO:
@@ -163,26 +174,58 @@ def _gaze_direction_from_ratios(
     return "center"
 
 
-def _eye_contact_and_gaze(
-    lms: list, head_forward: bool
-) -> tuple[bool, Optional[tuple[float, float, float, float]], bool, str]:
-    """Iris gaze + contact; fallback: eye_contact=head_forward, gaze_direction=unknown."""
-    ratios = _eye_contact_iris_ratios(lms)
-    if ratios is None:
-        return head_forward, None, True, "unknown"
+def _gaze_direction_from_baseline(
+    hl: float,
+    vl: float,
+    hr: float,
+    vr: float,
+    bl_hl: float,
+    bl_vl: float,
+    bl_hr: float,
+    bl_vr: float,
+) -> str:
+    dv = ((vl - bl_vl) + (vr - bl_vr)) * 0.5
+    if dv < -_GAZE_CAL_DV_UP:
+        return "up"
+    if dv > _GAZE_CAL_DV_DOWN:
+        return "down"
+    dh_max = max(abs(hl - bl_hl), abs(hr - bl_hr))
+    if dh_max > _GAZE_CAL_DH_LR:
+        return "left_or_right"
+    return "center"
 
-    hl, vl, hr, vr = ratios
-    gaze_direction = _gaze_direction_from_ratios(hl, vl, hr, vr)
 
+def _eye_contact_fixed(
+    hl: float, vl: float, hr: float, vr: float, gaze_direction: str
+) -> bool:
     h_ok_l = _IRIS_H_BAND_LO <= hl <= _IRIS_H_BAND_HI
     h_ok_r = _IRIS_H_BAND_LO <= hr <= _IRIS_H_BAND_HI
     v_ok_l = _IRIS_V_BAND_LO <= vl <= _IRIS_V_BAND_HI
     v_ok_r = _IRIS_V_BAND_LO <= vr <= _IRIS_V_BAND_HI
-
-    eye_contact = bool(
+    return bool(
         gaze_direction == "center" and h_ok_l and h_ok_r and v_ok_l and v_ok_r
     )
-    return eye_contact, ratios, False, gaze_direction
+
+
+def _eye_contact_calibrated(
+    hl: float,
+    vl: float,
+    hr: float,
+    vr: float,
+    bl_hl: float,
+    bl_vl: float,
+    bl_hr: float,
+    bl_vr: float,
+    gaze_direction: str,
+) -> bool:
+    if gaze_direction != "center":
+        return False
+    return (
+        abs(hl - bl_hl) <= _CALIBRATED_H_TOL
+        and abs(vl - bl_vl) <= _CALIBRATED_V_TOL
+        and abs(hr - bl_hr) <= _CALIBRATED_H_TOL
+        and abs(vr - bl_vr) <= _CALIBRATED_V_TOL
+    )
 
 
 class FacePerception:
@@ -201,7 +244,46 @@ class FacePerception:
         self._landmarker = vision.FaceLandmarker.create_from_options(options)
         self._looking_smooth: deque[bool] = deque(maxlen=_SMOOTHING_WINDOW)
 
+        self._calibrating = False
+        self._calibrated = False
+        self._calibration_samples: list[tuple[float, float, float, float]] = []
+        self._baseline: Optional[tuple[float, float, float, float]] = None
+
+    @property
+    def is_calibrated(self) -> bool:
+        return self._calibrated
+
+    @property
+    def calibration_status_text(self) -> str:
+        if self._calibrated:
+            return "calibrated"
+        if self._calibrating:
+            return f"calibrating {len(self._calibration_samples)}/{_CALIBRATION_TARGET_FRAMES}"
+        return "not calibrated"
+
+    def start_calibration(self) -> None:
+        self._calibrating = True
+        self._calibrated = False
+        self._baseline = None
+        self._calibration_samples = []
+
+    def reset_calibration(self) -> None:
+        self._calibrating = False
+        self._calibrated = False
+        self._baseline = None
+        self._calibration_samples = []
+
+    def _finalize_calibration_if_ready(self) -> None:
+        if len(self._calibration_samples) < _CALIBRATION_TARGET_FRAMES:
+            return
+        xs = list(zip(*self._calibration_samples))
+        self._baseline = tuple(sum(col) / len(col) for col in xs)
+        self._calibrated = True
+        self._calibrating = False
+        self._calibration_samples = []
+
     def detect(self, frame_rgb, timestamp_ms: int) -> FacePerceptionResult:
+        cal_text = self.calibration_status_text
         mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=frame_rgb)
         raw = self._landmarker.detect_for_video(mp_image, timestamp_ms)
         if not raw.face_landmarks:
@@ -214,13 +296,42 @@ class FacePerception:
                 gaze_direction="none",
                 raw_result=raw,
                 debug_text="no face",
+                calibrated=self._calibrated,
+                calibration_text=cal_text,
             )
 
         lms = raw.face_landmarks[0]
         head_forward, yaw_ratio, pitch_n = _head_forward(lms)
-        eye_contact, eye_ratios, _used_fallback, gaze_direction = (
-            _eye_contact_and_gaze(lms, head_forward)
-        )
+        eye_ratios = _eye_contact_iris_ratios(lms)
+
+        if (
+            self._calibrating
+            and head_forward
+            and eye_ratios is not None
+        ):
+            self._calibration_samples.append(eye_ratios)
+            self._finalize_calibration_if_ready()
+
+        if eye_ratios is None:
+            eye_contact = head_forward
+            gaze_direction = "unknown"
+            mode_tag = "mode=fallback/no_iris"
+        elif self._calibrated and self._baseline is not None:
+            bl_hl, bl_vl, bl_hr, bl_vr = self._baseline
+            hl, vl, hr, vr = eye_ratios
+            gaze_direction = _gaze_direction_from_baseline(
+                hl, vl, hr, vr, bl_hl, bl_vl, bl_hr, bl_vr
+            )
+            eye_contact = _eye_contact_calibrated(
+                hl, vl, hr, vr, bl_hl, bl_vl, bl_hr, bl_vr, gaze_direction
+            )
+            mode_tag = "mode=iris_calibrated"
+        else:
+            hl, vl, hr, vr = eye_ratios
+            gaze_direction = _gaze_direction_from_ratios_fixed(hl, vl, hr, vr)
+            eye_contact = _eye_contact_fixed(hl, vl, hr, vr, gaze_direction)
+            mode_tag = "mode=iris_fixed"
+
         raw_looking = bool(head_forward and eye_contact)
         self._looking_smooth.append(raw_looking)
         n_true = sum(1 for x in self._looking_smooth if x)
@@ -238,13 +349,16 @@ class FacePerception:
                 f"eye_y_L={vl:.2f}",
                 f"eye_x_R={hr:.2f}",
                 f"eye_y_R={vr:.2f}",
-                "mode=iris",
             ]
-        else:
-            parts.append("mode=fallback/no_iris")
-
+            if self._baseline is not None:
+                bh = self._baseline
+                parts.append(
+                    f"baseline_L=({bh[0]:.2f},{bh[1]:.2f}) R=({bh[2]:.2f},{bh[3]:.2f})"
+                )
+        parts.append(mode_tag)
         parts.append(f"raw_looking={raw_looking}")
 
+        cal_text = self.calibration_status_text
         return FacePerceptionResult(
             face_detected=True,
             head_forward=head_forward,
@@ -253,6 +367,8 @@ class FacePerception:
             gaze_direction=gaze_direction,
             raw_result=raw,
             debug_text="|".join(parts),
+            calibrated=self._calibrated,
+            calibration_text=cal_text,
         )
 
     def close(self) -> None:

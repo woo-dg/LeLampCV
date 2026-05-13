@@ -1,0 +1,14 @@
+{"timestamp": "2026-05-12T21:59:45.650216+00:00", "label": "person", "location_label": "center middle", "confidence": 0.8886666297912598, "bbox": [25, 75, 639, 479], "center": [332, 277], "state": "DISENGAGED"}
+{"timestamp": "2026-05-12T21:59:52.370734+00:00", "label": "person", "location_label": "center middle", "confidence": 0.8978071212768555, "bbox": [31, 80, 638, 479], "center": [334, 280], "state": "DISENGAGED"}
+{"timestamp": "2026-05-12T21:59:57.749464+00:00", "label": "person", "location_label": "center middle", "confidence": 0.9161006212234497, "bbox": [62, 81, 639, 478], "center": [350, 280], "state": "DISENGAGED"}
+{"timestamp": "2026-05-12T22:00:03.093717+00:00", "label": "person", "location_label": "center middle", "confidence": 0.8501842617988586, "bbox": [106, 80, 638, 479], "center": [372, 280], "state": "DISENGAGED"}
+{"timestamp": "2026-05-12T22:00:08.232304+00:00", "label": "person", "location_label": "center middle", "confidence": 0.8594371676445007, "bbox": [113, 92, 630, 479], "center": [372, 286], "state": "ENGAGED"}
+{"timestamp": "2026-05-12T22:00:10.228128+00:00", "label": "chair", "location_label": "center middle", "confidence": 0.5337010622024536, "bbox": [349, 234, 442, 298], "center": [396, 266], "state": "ENGAGED"}
+{"timestamp": "2026-05-12T22:00:13.406146+00:00", "label": "phone", "location_label": "center middle", "confidence": 0.9545292258262634, "bbox": [227, 145, 368, 429], "center": [298, 287], "state": "ENGAGED"}
+{"timestamp": "2026-05-12T22:00:13.406146+00:00", "label": "person", "location_label": "center middle", "confidence": 0.7083191275596619, "bbox": [210, 82, 600, 479], "center": [405, 280], "state": "ENGAGED"}
+{"timestamp": "2026-05-12T22:00:18.325084+00:00", "label": "skateboard", "location_label": "right upper", "confidence": 0.5521308183670044, "bbox": [481, 0, 570, 25], "center": [526, 12], "state": "ENGAGED"}
+{"timestamp": "2026-05-12T22:00:19.336064+00:00", "label": "person", "location_label": "center middle", "confidence": 0.9066343307495117, "bbox": [39, 75, 639, 479], "center": [339, 277], "state": "ENGAGED"}
+{"timestamp": "2026-05-12T22:00:24.704532+00:00", "label": "person", "location_label": "center middle", "confidence": 0.9221060276031494, "bbox": [45, 74, 639, 479], "center": [342, 276], "state": "DISENGAGED"}
+{"timestamp": "2026-05-12T22:00:30.694971+00:00", "label": "person", "location_label": "center middle", "confidence": 0.8960987329483032, "bbox": [26, 78, 638, 478], "center": [332, 278], "state": "ENGAGED"}
+{"timestamp": "2026-05-12T22:00:35.861480+00:00", "label": "person", "location_label": "center middle", "confidence": 0.8934480547904968, "bbox": [22, 77, 639, 479], "center": [330, 278], "state": "DISENGAGED"}
+{"timestamp": "2026-05-12T22:00:42.039110+00:00", "label": "person", "location_label": "center middle", "confidence": 0.921554446220398, "bbox": [35, 80, 639, 479], "center": [337, 280], "state": "ENGAGED"}

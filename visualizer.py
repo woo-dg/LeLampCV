@@ -1,6 +1,9 @@
+from typing import Optional
+
 import cv2
 from mediapipe.tasks.python.vision import drawing_utils, face_landmarker
 
+from object_perception import ObjectPerceptionResult
 from perception import FacePerceptionResult
 
 
@@ -18,7 +21,16 @@ def _state_bgr(state: str) -> tuple[int, int, int]:
     return (0, 0, 255)
 
 
-def draw_perception(frame, perception_result: FacePerceptionResult, state: str) -> None:
+def draw_perception(
+    frame,
+    perception_result: FacePerceptionResult,
+    state: str,
+    *,
+    fps: Optional[float] = None,
+    frame_ms: Optional[float] = None,
+    show_debug: bool = False,
+    object_result: Optional[ObjectPerceptionResult] = None,
+) -> None:
     if perception_result.face_detected and perception_result.raw_result.face_landmarks:
         drawing_utils.draw_landmarks(
             frame,
@@ -34,7 +46,7 @@ def draw_perception(frame, perception_result: FacePerceptionResult, state: str) 
     color = _state_bgr(state)
     cv2.putText(
         frame,
-        f"STATE (debounced): {state}",
+        f"STATE: {state}",
         (10, 35),
         cv2.FONT_HERSHEY_SIMPLEX,
         0.9,
@@ -43,19 +55,23 @@ def draw_perception(frame, perception_result: FacePerceptionResult, state: str) 
     )
     y = 65
     detail_color = (220, 220, 220)
-    cv2.putText(
-        frame,
-        f"GAZE: {perception_result.gaze_direction}",
-        (10, y),
-        cv2.FONT_HERSHEY_SIMPLEX,
-        0.65,
-        (180, 220, 255),
-        2,
-    )
-    y += 28
-    raw_engaged = perception_result.face_detected and perception_result.looking_at_camera
+
+    if show_debug and fps is not None and frame_ms is not None:
+        cv2.putText(
+            frame,
+            f"FPS ~ {fps:.1f}  frame_ms ~ {frame_ms:.1f}",
+            (10, y),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.55,
+            (180, 255, 180),
+            1,
+        )
+        y += 22
+
     lines = [
-        f"raw_engaged={raw_engaged}",
+        f"calibration: {perception_result.calibration_text}",
+        f"calibrated={perception_result.calibrated}",
+        f"gaze_direction={perception_result.gaze_direction}",
         f"face_detected={perception_result.face_detected}",
         f"head_forward={perception_result.head_forward}",
         f"eye_contact={perception_result.eye_contact}",
@@ -78,3 +94,73 @@ def draw_perception(frame, perception_result: FacePerceptionResult, state: str) 
             1,
         )
         y += 20
+
+    if object_result is not None:
+        _draw_object_overlay(frame, object_result, show_debug=show_debug)
+
+
+def _horizontal_bucket(location_label: str) -> str:
+    parts = location_label.split()
+    return parts[0] if parts else "?"
+
+
+def _draw_object_overlay(
+    frame,
+    object_result: ObjectPerceptionResult,
+    *,
+    show_debug: bool,
+) -> None:
+    fh, fw = frame.shape[0], frame.shape[1]
+    box_color = (60, 200, 100)
+    label_color = (230, 245, 230)
+
+    for obj in object_result.objects:
+        x1, y1, x2, y2 = obj.bbox
+        cv2.rectangle(frame, (x1, y1), (x2, y2), box_color, 2)
+        cap = f"{obj.label} {obj.confidence:.2f} {obj.location_label}"
+        ty = max(16, y1 - 4)
+        cv2.putText(
+            frame,
+            cap,
+            (x1, ty),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.48,
+            label_color,
+            1,
+            lineType=cv2.LINE_AA,
+        )
+
+    if object_result.objects:
+        parts = [
+            f"{o.label}({_horizontal_bucket(o.location_label)})"
+            for o in object_result.objects
+        ]
+        summary = "objects: " + ", ".join(parts)
+        max_chars = max(40, fw // 7)
+        if len(summary) > max_chars:
+            summary = summary[: max_chars - 3] + "..."
+    else:
+        summary = "objects: —"
+
+    cv2.putText(
+        frame,
+        summary,
+        (10, fh - 28),
+        cv2.FONT_HERSHEY_SIMPLEX,
+        0.52,
+        (180, 210, 255),
+        1,
+        lineType=cv2.LINE_AA,
+    )
+
+    if show_debug:
+        cv2.putText(
+            frame,
+            f"obj {object_result.debug_text}",
+            (10, fh - 8),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.45,
+            (140, 160, 200),
+            1,
+            lineType=cv2.LINE_AA,
+        )

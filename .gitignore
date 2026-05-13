@@ -1,0 +1,4 @@
+*.json
+credentials*.json
+*service*.json
+.env
