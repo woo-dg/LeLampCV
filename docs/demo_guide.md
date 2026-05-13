@@ -1,18 +1,39 @@
 # Demo guide
 
-Checklist for recording or live judging:
+Nothing in this repo hardcodes a canned demo sequence—the behaviors emerge from live gaze, timers, YOLO detections, and microphone input. This checklist exists so **recorded video can prove each challenge requirement** without improvising explanations mid-take.
 
-1. Terminal A: `python scripts/run_app.py`
-2. Terminal B: `cd simulator` then `python -m http.server 8000`
-3. Browser: open `http://localhost:8000`
-4. In the OpenCV window, press `c` and hold a neutral “looking at the lamp” pose until calibration finishes.
-5. Look toward the camera → confirm **ENGAGED** state / green-ish cue in overlay + twin.
-6. Look away → **DISENGAGED** / dimmer twin.
-7. Stay disengaged several seconds → attention-seeking variant triggers (motion/light pulse).
-8. Present an object clearly (e.g., bottle) until the console prints `memory saved: …`.
-9. Remove or obscure the object.
-10. Press `v`, ask aloud “where is my bottle?” (or type the question in the terminal feeding stdin).
-11. Listen for TTS; watch twin switch to **ANSWERING** while JSON cards update.
-12. Optionally show `evaluation/submission_summary.md` or CSV previews for judges.
+## Preconditions
 
-**Tip:** mute competing audio, face a diffuse light source, and frame head + shoulders so iris landmarks stay visible.
+- Two terminals + browser twin (`README.md` Running section).
+- Quiet-enough room for push-to-talk ASR; typing still works if audio fails.
+- Prefer **common YOLO COCO objects** (bottle, cup, chair, phone, laptop). Exotic props may never receive a class label.
+
+## Reproducible checklist (challenge coverage)
+
+1. **Simulator running** — `python -m http.server` inside `simulator/`; verify JSON polls succeed (`Pipeline` card updates).
+2. **Calibrate gaze (`c`)** — hold a neutral “looking at lamp/camera” pose until status reads calibrated.
+3. **Show ENGAGED** — intentional eye contact; confirm overlay + twin green-attentive posture.
+4. **Show DISENGAGED** — deliberate gaze away; confirm dim withdrawn pole + twin state text.
+5. **Attention-seeking** — remain disengaged ~few seconds until motion/light variant triggers; note variant label on HUD/twin.
+6. **Memory formation** — place object in frame until terminal prints `memory saved: <label> at <bucket>`.
+7. **Move object off-camera** — proves recall is not “currently visible cheating.”
+8. **Voice recall (`v`)** — ask “where is my <object>?” aloud; listen for TTS grounded answer.
+9. **Twin correlation** — observe **ANSWERING** behavior while lamp speaks; conversation card flips to memory mode / badge.
+10. **Evidence trail** — optionally screen-record Sheets rows (`map_behaviour`) scrolling with timestamps + pan/tilt/light columns, or show CSV snippets under `evaluation/`.
+
+## What reviewers learn from each step
+
+| Step | Proves |
+|------|--------|
+| 3–4 | Gaze pipeline + smoothing behave |
+| 5 | Higher-level behavior choreography fires off gaze timers |
+| 6–9 | Async vision → JSONL → memory-first conversation → audio works |
+| 10 | External audit matches simulator JSON (same command stream) |
+
+## Tips that save retakes
+
+- Avoid backlighting—iris ratios saturate fast.
+- After calibration, **do not** change seated height dramatically mid-demo.
+- If ASR mis-hears, repeat slowly or fall back to typed stdin questions—the routing logic is identical.
+
+This guide does not script wording; it only guarantees you captured **engagement, attention behavior, memory write, memory recall, and correlated twin motion** in one continuous take.

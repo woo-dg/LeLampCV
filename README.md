@@ -23,20 +23,53 @@ A software-first digital twin for an expressive lamp agent that detects attentio
 5. Show an object → `memory saved:` line in the console.
 6. Ask “where is my bottle?” (voice or typed) → spoken answer from memory + twin shows **ANSWERING**.
 
-## Architecture (text diagram)
+## Architecture
+
+Full system design (diagrams, data contracts, control loop, Sheets rationale): **[docs/system_design.md](docs/system_design.md)**.
+
+Source Mermaid (export to PNG/SVG before submission if you want a rendered figure): **[assets/diagrams/system_architecture.mmd](assets/diagrams/system_architecture.mmd)**.
+
+### Three concurrent paths
+
+**Real-time control path** — closes the loop from pixels to something the lamp “does”:
 
 ```
-camera + microphone
-    → perception.py / object_perception.py
-    → state_manager.py
-    → behavior.py
-    → simulator + voice + logs
-                ↘ memory.py
-                     → conversation.py + grok_client.py
-                     → voice_output.py
+camera → FacePerception → EngagementStateManager → behavior.py
+       → behavior_exporter → simulator/latest_behavior.json → Three.js twin
 ```
 
-`behavior.py` defines **`LampBehaviorCommand`** (angles, light, reason). The simulator polls `latest_behavior.json`; physical hardware could reuse the same payload. Google Sheets receives mirrored rows for auditing only—it does not drive the lamp. Object recall reads **`runtime/memory/object_memory.jsonl`**; Grok may rephrase but should not invent locations when memory routing applies.
+**Memory / conversation path** — object recall and Q&A sit beside gaze; they do not replace it:
+
+```
+camera (sampled) → async YOLO worker → memory.py (JSONL)
+stdin / voice → conversation.py → [memory evidence] → Grok (optional wording)
+               → voice_output + conversation_exporter → simulator/latest_conversation.json
+```
+
+**Logging / evaluation path** — proves what happened without affecting frame deadlines:
+
+```
+perception + FSM + behavior command → metrics.py (CSV under runtime/metrics/)
+                                   → Google Sheets row queue (optional audit log)
+frozen summaries + CSV copies → evaluation/
+```
+
+The Sheets logger and metrics logger see the **same** behavior commands the simulator consumes; they are not upstream controllers.
+
+## Evidence and logs
+
+These artifacts together show perception → command → memory → speech:
+
+| Artifact | What it proves |
+|----------|----------------|
+| [evaluation/submission_summary.md](evaluation/submission_summary.md) | Frozen headline metrics for judges (binary engagement + latency medians). |
+| Google Sheets **map_behaviour** / behavior log | Timestamped rows: gaze flags, FSM state, pan/tilt/light, debug text—readable proof of the command stream. |
+| `runtime/memory/object_memory.jsonl` | Append-only object sightings (gitignored; copy a snippet if a rubric asks for raw memory). |
+| `simulator/latest_behavior.json` | Same `LampBehaviorCommand` fields the twin animates (gitignored at runtime). |
+| `simulator/latest_conversation.json` | Question, answer, routing mode, memory hit flag (gitignored at runtime). |
+| Terminal | `memory saved: …`, `Conversation mode: …`, TTS status lines. |
+
+**map_behaviour acts like a run log for the command stream.** If this were connected to physical hardware, the same pan/tilt/light values being written to the sheet are the values that would be sent to the actuator/light layer. The simulator stays on local JSON for latency; the sheet is there so reviewers can scroll through decisions without replaying video.
 
 ## Repository layout
 
@@ -60,7 +93,7 @@ camera + microphone
 | `src/lelamp/visualizer.py` | OpenCV HUD |
 | `src/lelamp/paths.py` | Repo-root-relative paths |
 | `simulator/` | Three.js twin + example JSON schemas |
-| `docs/` | Architecture / perception / behavior / memory notes |
+| `docs/` | System design, architecture, tradeoffs, evaluation notes |
 | `evaluation/` | Frozen CSV + written summary for judges |
 | `scripts/` | `run_app.py`, `test_tts.py` |
 | `models/` | MediaPipe task file + YOLO weights (see `models/README.md`) |
@@ -134,24 +167,19 @@ Latency medians (main loop excludes blocking YOLO):
 - Total loop **23.74 ms**
 - Async object inference **212.35 ms**
 
-Details: `evaluation/README.md`, raw CSVs in `evaluation/`.
+Details: [evaluation/README.md](evaluation/README.md), methodology [docs/evaluation.md](docs/evaluation.md).
 
 ## Design decisions
 
-Short version—see `docs/tradeoffs.md` for narrative:
-
-- Iris-aware gaze beats head pose alone for “actually looking”.
-- Smoothing + debounce beats naive frame-wise thresholds.
-- **YOLOv8s** + async inference trades heavier models for smoother UX.
-- Memory-first routing beats LLM-first recall for object locations.
-- Digital twin decouples behavior logic from hardware bring-up.
+Engineering narrative with problem/decision/cost for each fork: **[docs/tradeoffs.md](docs/tradeoffs.md)**.  
+Module-level pipeline and failure containment: **[docs/architecture.md](docs/architecture.md)**.
 
 ## Limitations
 
 - YOLO only knows COCO-like everyday classes; weird props may never register.
 - Gaze quality depends on lighting, glasses, and calibration discipline.
 - Speech recognition mis-hears short fragments; typing still works.
-- The twin is behavioral stand-in for real servos / LEDs.
+- The twin is a behavioral stand-in for real servos / LEDs.
 - Memory is a simple JSONL scan—no embeddings or long-horizon reasoning.
 
 ## Future work
@@ -166,8 +194,7 @@ Short version—see `docs/tradeoffs.md` for narrative:
 
 Demo video: **TODO add link**
 
-## Screenshots / GIFs
+## Screenshots / GIFs / diagram export
 
-Screenshots/GIFs: **TODO** add simulator captures, memory recall, evaluation summary (`assets/screenshots/`, `assets/demo/`).
-
-Also drop an architecture diagram PNG/SVG under `assets/diagrams/` when ready.
+- Add simulator captures under `assets/screenshots/` or `assets/demo/`.
+- Render **[assets/diagrams/system_architecture.mmd](assets/diagrams/system_architecture.mmd)** to PNG or SVG (Mermaid CLI, VS Code plugin, or mermaid.live) and reference it here once exported.

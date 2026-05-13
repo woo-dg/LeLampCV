@@ -1,0 +1,38 @@
+flowchart TD
+    A[Webcam Frame] --> B[Face / Gaze Perception]
+    A --> C[Async Object Detection]
+    M[Microphone / Push-to-Talk] --> N[Voice Input]
+
+    B --> D[Binary Engagement Signal]
+    D --> E[Engagement State Manager]
+    E --> F[Behavior Mapper]
+
+    C --> G[Object Memory]
+    G --> H[Conversation Router]
+
+    N --> H
+    T[Typed Input] --> H
+
+    H --> I[Grok / xAI Formatter]
+    H --> J[Deterministic Memory Answer]
+
+    I --> K[Voice Output]
+    J --> K
+
+    H --> L[Conversation Export JSON]
+    F --> O[Behavior Export JSON]
+
+    O --> P[Three.js Digital Twin]
+    L --> P
+
+    F --> Q[Google Sheets Behavior Log]
+    B --> Q
+    E --> Q
+
+    C --> R[Memory JSONL]
+    G --> R
+
+    S[Metrics Logger] --> U[Evaluation Folder]
+    B --> S
+    E --> S
+    F --> S
