@@ -22,64 +22,6 @@ const latest = {
   brightness: 0.25,
 };
 
-const conversationUI = {
-  question: "",
-  answer: "",
-  mode: "",
-  memory_found: false,
-};
-
-function conversationModeLabel(mode, memoryFound) {
-  const m = (mode || "").toUpperCase();
-  if (m === "MEMORY_LOCATION_QUERY") {
-    return memoryFound ? "memory recall" : "no memory found";
-  }
-  if (m === "MEMORY_LIST_QUERY" || m === "MEMORY_LAST_SEEN_QUERY") {
-    return "memory recall";
-  }
-  if (m === "GENERAL_QUERY") return "general chat";
-  if (m === "LIVE_INFO_QUERY") return "live info";
-  if (m === "CLARIFICATION_NEEDED") return "clarification";
-  return mode ? mode.replace(/_/g, " ").toLowerCase() : "—";
-}
-
-function refreshConversationDom() {
-  const qEl = document.getElementById("conv-q");
-  const aEl = document.getElementById("conv-a");
-  const pill = document.getElementById("conv-mode-pill");
-  const badge = document.getElementById("conv-memory-badge");
-  if (!qEl || !aEl || !pill || !badge) return;
-
-  const hasTurn = Boolean(conversationUI.question || conversationUI.answer);
-  qEl.textContent = hasTurn ? conversationUI.question || "—" : "—";
-  aEl.textContent = hasTurn ? conversationUI.answer || "—" : "—";
-
-  const mode = conversationUI.mode || "";
-  pill.textContent = hasTurn
-    ? conversationModeLabel(mode, conversationUI.memory_found)
-    : "—";
-
-  const memModes = [
-    "MEMORY_LOCATION_QUERY",
-    "MEMORY_LIST_QUERY",
-    "MEMORY_LAST_SEEN_QUERY",
-  ];
-  const isMem = memModes.includes((mode || "").toUpperCase());
-  badge.classList.remove("hit", "miss", "is-hidden");
-  if (!hasTurn || !isMem) {
-    badge.classList.add("is-hidden");
-    badge.textContent = "";
-    return;
-  }
-  if (conversationUI.memory_found) {
-    badge.textContent = "memory hit";
-    badge.classList.add("hit");
-  } else {
-    badge.textContent = "no memory yet";
-    badge.classList.add("miss");
-  }
-}
-
 function colorFromName(name) {
   const c = new THREE.Color();
   switch ((name || "").toLowerCase()) {
@@ -149,31 +91,12 @@ async function fetchBehavior() {
   }
 }
 
-async function fetchConversation() {
-  try {
-    const r = await fetch("latest_conversation.json?t=" + Date.now(), {
-      cache: "no-store",
-    });
-    if (!r.ok) return;
-    const data = await r.json();
-    conversationUI.question = data.question ?? "";
-    conversationUI.answer = data.answer ?? "";
-    conversationUI.mode = data.mode ?? "";
-    conversationUI.memory_found = Boolean(data.memory_found);
-    refreshConversationDom();
-  } catch {
-    /* file may not exist yet */
-  }
-}
-
 async function pollTwinFiles() {
   await fetchBehavior();
-  await fetchConversation();
 }
 
 setInterval(pollTwinFiles, 120);
 pollTwinFiles();
-refreshConversationDom();
 
 const wrap = document.getElementById("canvas-wrap");
 const renderer = new THREE.WebGLRenderer({ antialias: true });

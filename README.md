@@ -106,7 +106,7 @@ These artifacts together show perception → command → memory → speech:
 pip install -r requirements.txt
 ```
 
-- **Grok** (optional): set `XAI_API_KEY`.
+- **Grok** (optional): set `XAI_API_KEY`, or put `XAI_API_KEY=...` in a repo-root `.env` file (gitignored). Required for general questions (e.g. “what is the sky?”); voice and terminal questions both use it once enabled.
 
 PowerShell:
 
@@ -115,6 +115,9 @@ $env:XAI_API_KEY="your_key_here"
 ```
 
 - **Google Sheets** (optional): download a service account JSON locally, point `LELAMP_GOOGLE_CREDENTIALS` at that file, and set `LELAMP_SPREADSHEET_ID`. Both must be valid or logging stays off. The JSON is ignored by `.gitignore`.
+  - **ID must be from the editable sheet**, e.g. `https://docs.google.com/spreadsheets/d/<THIS_ID>/edit`. Do **not** use the long `2PACX-…` segment from *Publish to web* / pubhtml URLs—that id cannot be opened with the Sheets API.
+  - Share the spreadsheet with the service account’s **`client_email`** (inside the JSON) as **Editor**.
+  - Set both variables in the **same terminal** you use for `python scripts/run_app.py`. On startup you should see `Google Sheets logging enabled: Behavior Log Run N` when it works; if logging is off, the console prints why.
 
 - **Voice input**: starts listening automatically when the app runs (`SpeechRecognition` + mic). Recognition **pauses while the lamp is speaking** so the reply is not transcribed as your next question. Type questions in the terminal as before. **PyAudio** can be finicky on Windows—install wheels separately if pip fails.
 - **Voice output**: default path uses **edge-tts** (`VOICE_BACKEND="auto"` in `src/lelamp/voice_output.py`) for a more natural voice; **pygame** plays the synthesized audio file on a worker thread. If edge-tts fails (network, playback), the worker prints a short warning and falls back to **pyttsx3** so answers still speak. Set `VOICE_BACKEND = "pyttsx3"` there to force SAPI-only.
@@ -157,6 +160,8 @@ Voice questions are picked up **continuously** from the microphone (no key). Met
 | `n` | Log settled engagement trial |
 | `m` | Force log trial |
 
+## Evaluation snapshot
+
 From [evaluation/submission_summary.md](evaluation/submission_summary.md) (binary gaze reliability):
 
 - Total trials: **109**, correct **93**, accuracy **85.32%**
@@ -192,12 +197,25 @@ Module-level pipeline and failure containment: **[docs/architecture.md](docs/arc
 - Interruption detection while speaking.
 - Prosody / frustration cues beyond gaze alone.
 
-## Demo video
+## Live walkthrough
 
-Demo video: **TODO add link**
+The system is meant to be shown live: the webcam visualizer, Three.js digital twin, terminal conversation, and **map_behaviour** Google Sheet can all be open at once so the perception-to-action loop is visible in real time.
+
+A typical walkthrough covers:
+
+1. Gaze calibration (`c`).
+2. **ENGAGED** / **DISENGAGED** detection (overlay + twin).
+3. Attention-seeking behavior after sustained disengagement.
+4. Object detection and a console **memory saved** line.
+5. Voice or typed question: “where is my bottle?” (or another remembered object).
+6. Spoken memory answer (TTS).
+7. Three.js lamp reaction (**ANSWERING** behavior while speaking).
+8. **map_behaviour** — scroll or filter the public Sheet ([map_behaviour — pubhtml](https://docs.google.com/spreadsheets/d/e/2PACX-1vShtsMiFy-dDUZ51HagY5_e9-NLyyAsHlfsPSc7sOkUMaLDrS_ck8D2QgWa2VOVpyOLNdU2xE47PjKz/pubhtml)) for timestamps plus pan/tilt/light columns alongside the live twin.
+
+There is no hosted demo recording in this repo; use **[docs/demo_guide.md](docs/demo_guide.md)** if you want a step checklist for a live session or a screen recording.
 
 ## Architecture diagram
 
 Source diagram (Mermaid): [assets/diagrams/system_architecture.mmd](assets/diagrams/system_architecture.mmd)
 
-Optional before submission: export that file to PNG or SVG if you want a static figure in the repo or write-up.
+You can export that Mermaid source to PNG or SVG when you need a static figure for a write-up.

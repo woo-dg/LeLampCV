@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 from typing import Optional
 
 import queue
@@ -30,13 +31,64 @@ from .visualizer import draw_perception
 from .voice_input import VoiceInput
 from .voice_output import VoiceOutput
 
-GOOGLE_CREDENTIALS_JSON = os.getenv("LELAMP_GOOGLE_CREDENTIALS", "").strip()
-GOOGLE_SPREADSHEET_ID = os.getenv("LELAMP_SPREADSHEET_ID", "").strip()
+from .repo_dotenv import load_repo_dotenv
+
+load_repo_dotenv()
+
+_REPO_ROOT = Path(__file__).resolve().parents[2]
+_DEFAULT_SERVICE_ACCOUNT_JSON = _REPO_ROOT / "service_account.json"
+_DEFAULT_SPREADSHEET_ID = "1bUHcBiV1oSGSghiYDUw43URHy4uTthYtjHOCfnwsJgg"
+
+
+def _spreadsheet_id_is_publish_export(url_or_id: str) -> bool:
+    """Published / pubhtml links use ``…/d/e/2PACX-…`` ids; the Sheets API needs ``…/d/<id>/edit``."""
+    s = url_or_id.strip()
+    if "/e/2PACX" in s or "/d/e/" in s:
+        return True
+    return s.startswith("2PACX") or s.startswith("e/2PACX")
+
+
+_raw_google_cred = os.getenv("LELAMP_GOOGLE_CREDENTIALS", "").strip()
+_raw_sheet_id = os.getenv("LELAMP_SPREADSHEET_ID", "").strip()
+
+GOOGLE_CREDENTIALS_JSON = (
+    str(Path(_raw_google_cred).expanduser())
+    if _raw_google_cred
+    else str(_DEFAULT_SERVICE_ACCOUNT_JSON)
+)
+GOOGLE_SPREADSHEET_ID = _raw_sheet_id or _DEFAULT_SPREADSHEET_ID
+_cred_file = Path(GOOGLE_CREDENTIALS_JSON)
 _sheets_ok = (
-    bool(GOOGLE_CREDENTIALS_JSON and GOOGLE_SPREADSHEET_ID)
-    and os.path.isfile(GOOGLE_CREDENTIALS_JSON)
+    bool(GOOGLE_SPREADSHEET_ID)
+    and _cred_file.is_file()
+    and not _spreadsheet_id_is_publish_export(GOOGLE_SPREADSHEET_ID)
 )
 ENABLE_GOOGLE_SHEETS_LOGGING = _sheets_ok
+
+
+def _log_google_sheets_preflight() -> None:
+    """Explain why Sheets might stay off before we construct the logger."""
+    if ENABLE_GOOGLE_SHEETS_LOGGING:
+        return
+    if GOOGLE_SPREADSHEET_ID and _spreadsheet_id_is_publish_export(GOOGLE_SPREADSHEET_ID):
+        print(
+            "Google Sheets logging off: LELAMP_SPREADSHEET_ID looks like a *published / pubhtml* "
+            "id (often starts with 2PACX). Open the spreadsheet as Editor and copy the id from "
+            "the URL …/spreadsheets/d/<COPY_THIS>/edit — not from Publish to web."
+        )
+        return
+    if not _cred_file.is_file():
+        print(
+            "Google Sheets logging off: credentials file not found. Place "
+            f"`service_account.json` at {_DEFAULT_SERVICE_ACCOUNT_JSON} "
+            "or set LELAMP_GOOGLE_CREDENTIALS to your JSON path."
+        )
+        return
+    if not GOOGLE_SPREADSHEET_ID:
+        print("Google Sheets logging off: LELAMP_SPREADSHEET_ID not set.")
+        return
+
+
 ENABLE_BEHAVIOR_EXPORT = True
 ENABLE_PERCEPTION_DEBUG = True
 ENABLE_OBJECT_DETECTION = True
@@ -120,18 +172,13 @@ def main() -> None:
 
     perception = FacePerception()
     state_manager = EngagementStateManager()
-    sheet_logger = (
-        GoogleSheetsBehaviorLogger(GOOGLE_CREDENTIALS_JSON, GOOGLE_SPREADSHEET_ID)
-        if ENABLE_GOOGLE_SHEETS_LOGGING
-        else None
-    )
-    if (
-        (GOOGLE_CREDENTIALS_JSON or GOOGLE_SPREADSHEET_ID)
-        and not ENABLE_GOOGLE_SHEETS_LOGGING
-    ):
-        print(
-            "Google Sheets logging off (need existing file at "
-            "LELAMP_GOOGLE_CREDENTIALS and LELAMP_SPREADSHEET_ID)"
+    if not ENABLE_GOOGLE_SHEETS_LOGGING:
+        _log_google_sheets_preflight()
+    sheet_logger: Optional[GoogleSheetsBehaviorLogger] = None
+    if ENABLE_GOOGLE_SHEETS_LOGGING:
+        sheet_logger = GoogleSheetsBehaviorLogger(
+            str(_cred_file.resolve()),
+            GOOGLE_SPREADSHEET_ID,
         )
     object_perception = ObjectPerception() if ENABLE_OBJECT_DETECTION else None
     async_object_perception: Optional[AsyncObjectPerception] = None

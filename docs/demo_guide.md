@@ -1,13 +1,15 @@
 # Demo guide
 
-Nothing in this repo hardcodes a canned demo sequence—the behaviors emerge from live gaze, timers, YOLO detections, and microphone input. This checklist exists so **recorded video can prove each challenge requirement** without improvising explanations mid-take.
+Nothing in this repo hardcodes a canned demo sequence—the behaviors emerge from live gaze, timers, YOLO detections, and microphone input. This checklist is for **any walkthrough where you need to show the challenge steps clearly**: a **live** session (screen share on Meet/Zoom) or a **recording**. It is not a requirement that you upload a video to the repo.
+
+Use it when you want reviewers (or yourself) to see engagement, attention behavior, memory write, memory recall, and correlated twin motion without improvising explanations mid-stream.
 
 ## Preconditions
 
 - Two terminals + browser twin (`README.md` Running section).
 - Quiet-enough room for always-on ASR; typing still works if audio fails.
 - Prefer **common YOLO COCO objects** (bottle, cup, chair, phone, laptop). Exotic props may never receive a class label.
-- Run `python scripts/test_tts.py` once before recording so edge-tts/pygame (or pyttsx3 fallback) works on your machine.
+- Run `python scripts/test_tts.py` once before the walkthrough so edge-tts/pygame (or pyttsx3 fallback) works on your machine.
 
 ## Reproducible checklist (challenge coverage)
 
@@ -19,8 +21,8 @@ Nothing in this repo hardcodes a canned demo sequence—the behaviors emerge fro
 6. **Memory formation** — place object in frame until terminal prints `memory saved: <label> at <bucket>`.
 7. **Move object off-camera** — proves recall is not “currently visible cheating.”
 8. **Voice recall** — ask your recall question aloud (mic listens continuously; no key); listen for TTS grounded answer.
-9. **Twin correlation** — observe **ANSWERING** behavior while lamp speaks; conversation card flips to memory mode / badge.
-10. **Evidence trail** — optionally screen-record Sheets rows (`map_behaviour`) scrolling with timestamps + pan/tilt/light columns, or show CSV snippets under `evaluation/`.
+9. **Twin correlation** — while the lamp speaks, confirm **ANSWERING** on the OpenCV overlay and the Three.js twin’s motion/light lines up with the reply you triggered (voice or typed stdin—the routing is the same).
+10. **Evidence trail** — optionally open **map_behaviour** ([pubhtml](https://docs.google.com/spreadsheets/d/e/2PACX-1vShtsMiFy-dDUZ51HagY5_e9-NLyyAsHlfsPSc7sOkUMaLDrS_ck8D2QgWa2VOVpyOLNdU2xE47PjKz/pubhtml)) alongside the run, or show CSV snippets under `evaluation/`.
 
 ## What reviewers learn from each step
 
@@ -35,7 +37,7 @@ Nothing in this repo hardcodes a canned demo sequence—the behaviors emerge fro
 
 - The OpenCV window is **mirrored** like a selfie preview; your left/right matches what the model sees.
 - Avoid backlighting—iris ratios saturate fast.
-- After calibration, **do not** change seated height dramatically mid-demo.
+- After calibration, **do not** change seated height dramatically mid-walkthrough.
 - If ASR mis-hears, repeat slowly or fall back to typed stdin questions—the routing logic is identical.
 
-This guide does not script wording; it only guarantees you captured **engagement, attention behavior, memory write, memory recall, and correlated twin motion** in one continuous take.
+This guide does not script wording; it only helps you hit **engagement, attention behavior, memory write, memory recall, and correlated twin motion** in one coherent live demo or recording.
