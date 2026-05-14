@@ -398,9 +398,12 @@ class ConversationManager:
         loc = entry.location_label
         disp = entry.label
         if when:
-            det = f"I last saw your {disp} at {loc} at {when}."
+            det = (
+                f"I saw your {disp} last time—it was in the {loc} of the frame, "
+                f"around {when}."
+            )
         else:
-            det = f"I last saw your {disp} at {loc}."
+            det = f"I saw your {disp} last time in the {loc} of the frame."
         ev = _entry_evidence(entry)
         ans = self._polish_memory_answer(
             user_question=raw_q,

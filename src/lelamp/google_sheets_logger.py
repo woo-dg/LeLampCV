@@ -13,7 +13,11 @@ from .behavior import LampBehaviorCommand
 from .perception import FacePerceptionResult
 
 _LEGACY_WORKSHEET_TITLE = "Behavior Log"
-_RUN_TITLE_RE = re.compile(r"^Behavior Log Run (\d+)$")
+# map_behaviour uses "Behavior Log Run N"; older sessions may use "Behaviour Map N".
+_RUN_TITLE_PATTERNS = (
+    re.compile(r"^(?:Behaviour|Behavior) Log Run (\d+)$", re.IGNORECASE),
+    re.compile(r"^(?:Behaviour|Behavior)\s*Map\s*(\d+)\s*$", re.IGNORECASE),
+)
 
 _HEADERS = [
     "timestamp",
@@ -43,10 +47,60 @@ _QUEUE_MAX = 64
 def _max_behavior_run_number(spreadsheet: gspread.Spreadsheet) -> int:
     highest = 0
     for ws in spreadsheet.worksheets():
-        m = _RUN_TITLE_RE.match(ws.title.strip())
-        if m:
-            highest = max(highest, int(m.group(1)))
+        title = ws.title.strip()
+        for pat in _RUN_TITLE_PATTERNS:
+            m = pat.match(title)
+            if m:
+                highest = max(highest, int(m.group(1)))
+                break
     return highest
+
+
+def _existing_worksheet_titles_lower(spreadsheet: gspread.Spreadsheet) -> set[str]:
+    return {ws.title.strip().lower() for ws in spreadsheet.worksheets()}
+
+
+def _add_session_run_worksheet(
+    spreadsheet: gspread.Spreadsheet,
+    *,
+    headers: list[str],
+) -> tuple[Any, str]:
+    """Create the next ``Behavior Log Run N`` tab (same naming as map_behaviour)."""
+    base = _max_behavior_run_number(spreadsheet)
+    taken_lower = _existing_worksheet_titles_lower(spreadsheet)
+    last_error: Optional[BaseException] = None
+
+    for offset in range(200):
+        n = base + 1 + offset
+        title = f"Behavior Log Run {n}"
+        if title.lower() in taken_lower:
+            continue
+        try:
+            ws = spreadsheet.add_worksheet(
+                title=title,
+                rows=1000,
+                cols=len(headers),
+            )
+            ws.append_row(headers)
+            taken_lower.add(title.lower())
+            return ws, title
+        except Exception as exc:
+            last_error = exc
+            msg = str(exc).lower()
+            if (
+                "already exists" in msg
+                or "duplicate" in msg
+                or "already been taken" in msg
+                or "invalid title" in msg
+                or "already created" in msg
+            ):
+                taken_lower.add(title.lower())
+                continue
+            raise
+
+    raise RuntimeError(
+        f"Could not create Behavior Log Run worksheet after retries: {last_error!r}"
+    )
 
 
 class GoogleSheetsBehaviorLogger:
@@ -74,14 +128,10 @@ class GoogleSheetsBehaviorLogger:
             spreadsheet = gc.open_by_key(spreadsheet_id)
 
             if create_new_session_sheet:
-                next_n = _max_behavior_run_number(spreadsheet) + 1
-                title = f"Behavior Log Run {next_n}"
-                ws = spreadsheet.add_worksheet(
-                    title=title,
-                    rows=1000,
-                    cols=len(_HEADERS),
+                ws, title = _add_session_run_worksheet(
+                    spreadsheet,
+                    headers=_HEADERS,
                 )
-                ws.append_row(_HEADERS)
                 print(f"Google Sheets logging enabled: {title}")
             else:
                 try:
@@ -105,8 +155,10 @@ class GoogleSheetsBehaviorLogger:
                 name="GoogleSheetsBehaviorLogger",
             )
             self._worker.start()
-        except Exception:
-            print("Google Sheets logging disabled")
+        except Exception as exc:
+            print(
+                f"Google Sheets logging disabled ({type(exc).__name__}: {exc})"
+            )
             self._worksheet = None
             self._enabled = False
             self._queue = None

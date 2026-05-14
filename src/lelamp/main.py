@@ -48,6 +48,8 @@ METRICS_LATENCY_LOG_INTERVAL_SECONDS = 1.0
 METRICS_EXPECTED_MIN_SETTLE_S = 0.75
 OBJECT_DETECTION_INTERVAL_SECONDS = 1.0
 
+MIRROR_CAMERA_VIEW = True
+
 ANSWER_DURATION_S = 3.0
 
 LOG_INTERVAL_SECONDS = 0.5
@@ -99,7 +101,6 @@ def main() -> None:
         "  q  quit",
         "  c  calibrate gaze",
         "  r  reset calibration",
-        "  v  push-to-talk voice input",
     ]
     if ENABLE_METRICS:
         lines.extend(
@@ -112,6 +113,10 @@ def main() -> None:
             ]
         )
     print("\n".join(lines) + "\n")
+    if MIRROR_CAMERA_VIEW:
+        print("Camera mirror view: enabled")
+    else:
+        print("Camera mirror view: disabled")
 
     perception = FacePerception()
     state_manager = EngagementStateManager()
@@ -157,9 +162,16 @@ def main() -> None:
 
     voice_input: Optional[VoiceInput]
     if ENABLE_VOICE_INPUT:
-        voice_input = VoiceInput(enabled=True)
+        voice_input = VoiceInput(
+            enabled=True,
+            speaking_check=lambda: (
+                voice_output.is_speaking()
+                if voice_output is not None and voice_output.is_available()
+                else False
+            ),
+        )
         if voice_input.is_available():
-            print("Voice input enabled")
+            print("Voice input enabled (always-on; pauses while lamp speaks)")
         else:
             print("Voice input disabled")
     else:
@@ -258,6 +270,8 @@ def main() -> None:
             success, frame = webcam.read()
             if not success:
                 break
+            if MIRROR_CAMERA_VIEW:
+                frame = cv2.flip(frame, 1)  # Mirror the camera feed for a more natural demo/self-view.
             frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             frame_ms = (time.perf_counter() - t_cap) * 1000.0
 
@@ -471,17 +485,6 @@ def main() -> None:
                 perception.start_calibration()
             elif key == ord("r"):
                 perception.reset_calibration()
-            elif key == ord("v"):
-                if (
-                    ENABLE_VOICE_INPUT
-                    and voice_input is not None
-                    and voice_input.is_available()
-                ):
-                    voice_input.start_listening_async()
-                elif ENABLE_VOICE_INPUT:
-                    print(
-                        "Voice input: unavailable (install SpeechRecognition and PyAudio)"
-                    )
             elif key == ord("1"):
                 if ENABLE_METRICS:
                     metrics_expected = "ENGAGED"
@@ -509,6 +512,8 @@ def main() -> None:
             print("Metrics: wrote runtime/metrics/summary.md")
         if voice_output is not None:
             voice_output.close()
+        if voice_input is not None:
+            voice_input.close()
         if sheet_logger is not None:
             sheet_logger.close_session()
         webcam.release()

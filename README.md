@@ -10,7 +10,7 @@ A software-first digital twin for an expressive lamp agent that detects attentio
 - Maps states to lamp behaviors (pose + light) with several attention-seeking variants.
 - Runs **YOLOv8** object detection on a background thread and logs sightings to JSONL memory.
 - Routes **memory-first** for location-style questions; optional **Grok/xAI** paraphrases grounded answers and handles general chat.
-- Speaks replies with **pyttsx3** (platform TTS).
+- Speaks answers via **edge-tts** (neural voice) with **pygame** playback when available; **pyttsx3** remains the offline fallback.
 - Exports JSON for a **Three.js** viewer at `simulator/`.
 - Optionally logs behavior rows to **Google Sheets** via a service account (local credentials file, never committed).
 
@@ -84,7 +84,7 @@ These artifacts together show perception → command → memory → speech:
 | `src/lelamp/conversation_exporter.py` | `simulator/latest_conversation.json` |
 | `src/lelamp/memory.py` | JSONL object memory |
 | `src/lelamp/grok_client.py` | xAI Grok client (OpenAI-compatible API) |
-| `src/lelamp/voice_input.py` | Push-to-talk speech recognition |
+| `src/lelamp/voice_input.py` | Always-on speech recognition (mic pauses during TTS) |
 | `src/lelamp/voice_output.py` | Non-blocking TTS worker |
 | `src/lelamp/google_sheets_logger.py` | Optional Sheets sink |
 | `src/lelamp/metrics.py` | Latency + engagement CSV logging |
@@ -116,7 +116,9 @@ $env:XAI_API_KEY="your_key_here"
 
 - **Google Sheets** (optional): download a service account JSON locally, point `LELAMP_GOOGLE_CREDENTIALS` at that file, and set `LELAMP_SPREADSHEET_ID`. Both must be valid or logging stays off. The JSON is ignored by `.gitignore`.
 
-- **Voice input**: requires `SpeechRecognition` plus working microphone access; **PyAudio** can be finicky on Windows—install wheels separately if pip fails.
+- **Voice input**: starts listening automatically when the app runs (`SpeechRecognition` + mic). Recognition **pauses while the lamp is speaking** so the reply is not transcribed as your next question. Type questions in the terminal as before. **PyAudio** can be finicky on Windows—install wheels separately if pip fails.
+- **Voice output**: default path uses **edge-tts** (`VOICE_BACKEND="auto"` in `src/lelamp/voice_output.py`) for a more natural voice; **pygame** plays the synthesized audio file on a worker thread. If edge-tts fails (network, playback), the worker prints a short warning and falls back to **pyttsx3** so answers still speak. Set `VOICE_BACKEND = "pyttsx3"` there to force SAPI-only.
+- **Camera**: the OpenCV preview is **mirrored horizontally by default** (`MIRROR_CAMERA_VIEW` in `src/lelamp/main.py`) so it behaves like a selfie preview; perception, YOLO, and overlays use that same flipped frame so boxes and left/right memory buckets match what you see.
 
 ## Running
 
@@ -144,14 +146,16 @@ The entry script `chdir`s to the repo root so JSON exports land in `simulator/`.
 | `q` | Quit |
 | `c` | Calibrate gaze |
 | `r` | Reset calibration |
-| `v` | Push-to-talk voice input |
+
+Voice questions are picked up **continuously** from the microphone (no key). Metrics keys:
+
+| Key | Action |
+|-----|--------|
 | `1` | Expected **ENGAGED** (metrics) |
 | `2` | Expected **DISENGAGED** |
 | `0` | Clear expected label |
 | `n` | Log settled engagement trial |
 | `m` | Force log trial |
-
-## Evaluation snapshot
 
 From [evaluation/submission_summary.md](evaluation/submission_summary.md) (binary gaze reliability):
 

@@ -5,8 +5,9 @@ Nothing in this repo hardcodes a canned demo sequence—the behaviors emerge fro
 ## Preconditions
 
 - Two terminals + browser twin (`README.md` Running section).
-- Quiet-enough room for push-to-talk ASR; typing still works if audio fails.
+- Quiet-enough room for always-on ASR; typing still works if audio fails.
 - Prefer **common YOLO COCO objects** (bottle, cup, chair, phone, laptop). Exotic props may never receive a class label.
+- Run `python scripts/test_tts.py` once before recording so edge-tts/pygame (or pyttsx3 fallback) works on your machine.
 
 ## Reproducible checklist (challenge coverage)
 
@@ -17,7 +18,7 @@ Nothing in this repo hardcodes a canned demo sequence—the behaviors emerge fro
 5. **Attention-seeking** — remain disengaged ~few seconds until motion/light variant triggers; note variant label on HUD/twin.
 6. **Memory formation** — place object in frame until terminal prints `memory saved: <label> at <bucket>`.
 7. **Move object off-camera** — proves recall is not “currently visible cheating.”
-8. **Voice recall (`v`)** — ask “where is my <object>?” aloud; listen for TTS grounded answer.
+8. **Voice recall** — ask your recall question aloud (mic listens continuously; no key); listen for TTS grounded answer.
 9. **Twin correlation** — observe **ANSWERING** behavior while lamp speaks; conversation card flips to memory mode / badge.
 10. **Evidence trail** — optionally screen-record Sheets rows (`map_behaviour`) scrolling with timestamps + pan/tilt/light columns, or show CSV snippets under `evaluation/`.
 
@@ -32,6 +33,7 @@ Nothing in this repo hardcodes a canned demo sequence—the behaviors emerge fro
 
 ## Tips that save retakes
 
+- The OpenCV window is **mirrored** like a selfie preview; your left/right matches what the model sees.
 - Avoid backlighting—iris ratios saturate fast.
 - After calibration, **do not** change seated height dramatically mid-demo.
 - If ASR mis-hears, repeat slowly or fall back to typed stdin questions—the routing logic is identical.

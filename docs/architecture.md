@@ -4,7 +4,7 @@ LeLampCV is split into modules with narrow imports so you can replace one piece 
 
 ## High-level pipeline
 
-1. **Capture** — webcam frames every iteration; microphone only when push-to-talk fires.
+1. **Capture** — webcam frames every iteration; microphone handled by a background listener that pauses while the lamp speaks (no push-to-talk key).
 2. **Face/gaze perception** — MediaPipe Face Landmarker → boolean engagement primitive + debug vectors.
 3. **FSM** — debounced gaze → discrete lamp states including attention/cooldown choreography.
 4. **Behavior command** — numeric pose + light targets + human-readable reasons.
